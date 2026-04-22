@@ -1,0 +1,907 @@
+import { useState, useEffect, useRef } from "react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+
+// ── GLOBAL STYLES ──────────────────────────────────────────────────────────
+const G = {
+  antrasit: "#1a1d23",
+  antrasit2: "#22262e",
+  antrasit3: "#2c3140",
+  mercan: "#e8613a",
+  mercan2: "#ff7a52",
+  gold: "#d4a017",
+  silver: "#a8b2c0",
+  bronze: "#cd7f32",
+  green: "#22c55e",
+  red: "#ef4444",
+  text: "#e8eaf0",
+  textMuted: "#8892a4",
+  border: "#333a47",
+};
+
+const css = `
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { height: 100%; background: ${G.antrasit}; color: ${G.text}; font-family: 'DM Sans', sans-serif; }
+  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: ${G.antrasit2}; }
+  ::-webkit-scrollbar-thumb { background: ${G.border}; border-radius: 3px; }
+  input, select, textarea { font-family: inherit; }
+  button { cursor: pointer; font-family: inherit; }
+`;
+
+// ── TRANSLATIONS ──────────────────────────────────────────────────────────
+const T = {
+  tr: {
+    welcome: "Hoş Geldiniz", selectLang: "Dil Seçin", continue: "Devam Et",
+    topDish: "Bu Haftanın En Çok Tercih Edilen Yemeği",
+    cravingLabel: "Canın ne çekti?", cravingPlaceholder: "Örn: sıcak, acılı, tatlı...",
+    menu: "Menü", foods: "Yemekler", soups: "Çorbalar", drinks: "İçecekler",
+    addToCart: "Sepete Ekle", cart: "Sepetim", total: "Toplam",
+    pay: "Ödeme Yap", cash: "Nakit", card: "Kart",
+    cashMsg: "Kasaya Gidiniz", tip: "Bahşiş vermek ister misiniz?",
+    tipYes: "Evet, %10", tipNo: "Hayır Teşekkürler",
+    cardInfo: "Kart Bilgileri", cardNum: "Kart Numarası", expiry: "Son Kullanma", cvv: "CVV",
+    payNow: "Ödemeyi Tamamla", paySuccess: "Ödeme Başarılı!", payFail: "Ödeme Başarısız",
+    note: "Not ekle...", rankings: "Sıralamalar", points: "puan",
+    name: "Ad Soyad", phone: "Telefon Numarası", login: "Giriş Yap",
+    note_label: "Not", price_label: "Fiyat", rating_label: "Puan", time_label: "Süre",
+    min: "dk", prepare: "Hazırlanma",
+  },
+  en: {
+    welcome: "Welcome", selectLang: "Select Language", continue: "Continue",
+    topDish: "This Week's Most Preferred Dish",
+    cravingLabel: "What are you craving?", cravingPlaceholder: "e.g. spicy, warm, sweet...",
+    menu: "Menu", foods: "Foods", soups: "Soups", drinks: "Drinks",
+    addToCart: "Add to Cart", cart: "My Cart", total: "Total",
+    pay: "Pay", cash: "Cash", card: "Card",
+    cashMsg: "Please Go to Cashier", tip: "Would you like to add a tip?",
+    tipYes: "Yes, 10%", tipNo: "No Thanks",
+    cardInfo: "Card Details", cardNum: "Card Number", expiry: "Expiry", cvv: "CVV",
+    payNow: "Complete Payment", paySuccess: "Payment Successful!", payFail: "Payment Failed",
+    note: "Add note...", rankings: "Rankings", points: "pts",
+    name: "Full Name", phone: "Phone Number", login: "Login",
+    note_label: "Note", price_label: "Price", rating_label: "Rating", time_label: "Time",
+    min: "min", prepare: "Prep",
+  },
+  es: {
+    welcome: "Bienvenido", selectLang: "Seleccionar Idioma", continue: "Continuar",
+    topDish: "El Plato Más Preferido Esta Semana",
+    cravingLabel: "¿Qué te apetece?", cravingPlaceholder: "ej. picante, caliente, dulce...",
+    menu: "Menú", foods: "Comidas", soups: "Sopas", drinks: "Bebidas",
+    addToCart: "Añadir", cart: "Mi Carrito", total: "Total",
+    pay: "Pagar", cash: "Efectivo", card: "Tarjeta",
+    cashMsg: "Vaya a Caja", tip: "¿Desea dejar propina?",
+    tipYes: "Sí, 10%", tipNo: "No Gracias",
+    cardInfo: "Datos de Tarjeta", cardNum: "Número de Tarjeta", expiry: "Caducidad", cvv: "CVV",
+    payNow: "Completar Pago", paySuccess: "¡Pago Exitoso!", payFail: "Pago Fallido",
+    note: "Añadir nota...", rankings: "Clasificaciones", points: "pts",
+    name: "Nombre Completo", phone: "Número de Teléfono", login: "Entrar",
+    note_label: "Nota", price_label: "Precio", rating_label: "Puntos", time_label: "Tiempo",
+    min: "min", prepare: "Prep",
+  },
+};
+
+// ── INITIAL DATA ───────────────────────────────────────────────────────────
+const INITIAL_MENU = {
+  foods: [
+    { id: "f1", name: "Adana Kebabı", type: "food", price: 180, rating: 4.8, time: 20, sales: 142, img: "https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=300&q=80" },
+    { id: "f2", name: "Tokat Kebabı", type: "food", price: 190, rating: 4.7, time: 25, sales: 98, img: "https://images.unsplash.com/photo-1544025162-d76694265947?w=300&q=80" },
+    { id: "f3", name: "Izgara Tavuk", type: "food", price: 150, rating: 4.6, time: 18, sales: 201, img: "https://images.unsplash.com/photo-1598103442097-8b74394b95c3?w=300&q=80" },
+    { id: "f4", name: "Lahmacun", type: "food", price: 60, rating: 4.5, time: 12, sales: 315, img: "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=300&q=80" },
+    { id: "f5", name: "Bonfile", type: "food", price: 320, rating: 4.9, time: 30, sales: 76, img: "https://images.unsplash.com/photo-1558030006-450675393462?w=300&q=80" },
+  ],
+  soups: [
+    { id: "s1", name: "Mercimek Çorbası", type: "soup", price: 45, rating: 4.7, time: 8, sales: 289, img: "https://images.unsplash.com/photo-1547592180-85f173990554?w=300&q=80" },
+    { id: "s2", name: "Domates Çorbası", type: "soup", price: 45, rating: 4.5, time: 8, sales: 178, img: "https://images.unsplash.com/photo-1603105037880-880cd4edfb0d?w=300&q=80" },
+    { id: "s3", name: "Mısır Çorbası", type: "soup", price: 50, rating: 4.4, time: 10, sales: 134, img: "https://images.unsplash.com/photo-1476718406336-bb5a9690ee2a?w=300&q=80" },
+    { id: "s4", name: "Tarhana Çorbası", type: "soup", price: 48, rating: 4.6, time: 8, sales: 156, img: "https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=300&q=80" },
+  ],
+  drinks: [
+    { id: "d1", name: "Kola", type: "drink", price: 30, rating: 4.3, time: 1, sales: 421, stock: 50, img: "https://images.unsplash.com/photo-1629203851122-3726ecdf080e?w=300&q=80" },
+    { id: "d2", name: "Ayran", type: "drink", price: 20, rating: 4.8, time: 1, sales: 380, stock: 80, img: "https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=300&q=80" },
+    { id: "d3", name: "Ice Tea", type: "drink", price: 35, rating: 4.4, time: 1, sales: 210, stock: 40, img: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=300&q=80" },
+    { id: "d4", name: "Su", type: "drink", price: 10, rating: 4.9, time: 1, sales: 600, stock: 200, img: "https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=300&q=80" },
+  ],
+};
+
+const INITIAL_LEADERBOARD = [
+  { name: "Ahmet Y.", points: 2840 },
+  { name: "Fatma K.", points: 2310 },
+  { name: "Mehmet A.", points: 1980 },
+  { name: "Zeynep T.", points: 1640 },
+  { name: "Emre S.", points: 1220 },
+];
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+const Btn = ({ children, onClick, style, variant = "primary", small }) => {
+  const base = {
+    border: "none", borderRadius: 10, fontFamily: "'DM Sans'", fontWeight: 600,
+    cursor: "pointer", transition: "all 0.2s", letterSpacing: 0.3,
+    padding: small ? "8px 16px" : "12px 24px",
+    fontSize: small ? 13 : 15,
+  };
+  const variants = {
+    primary: { background: `linear-gradient(135deg, ${G.mercan}, ${G.mercan2})`, color: "#fff", boxShadow: `0 4px 20px ${G.mercan}44` },
+    ghost: { background: "transparent", color: G.mercan, border: `1px solid ${G.mercan}66` },
+    danger: { background: `linear-gradient(135deg, ${G.red}, #f87171)`, color: "#fff" },
+    success: { background: `linear-gradient(135deg, ${G.green}, #4ade80)`, color: "#fff" },
+    dark: { background: G.antrasit3, color: G.text, border: `1px solid ${G.border}` },
+  };
+  return <button style={{ ...base, ...variants[variant], ...style }} onClick={onClick}>{children}</button>;
+};
+
+const Card = ({ children, style }) => (
+  <div style={{ background: G.antrasit2, border: `1px solid ${G.border}`, borderRadius: 16, padding: 20, ...style }}>
+    {children}
+  </div>
+);
+
+const Input = ({ label, ...props }) => (
+  <div style={{ marginBottom: 12 }}>
+    {label && <label style={{ fontSize: 12, color: G.textMuted, display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>{label}</label>}
+    <input {...props} style={{
+      width: "100%", background: G.antrasit3, border: `1px solid ${G.border}`, borderRadius: 8,
+      padding: "10px 14px", color: G.text, fontSize: 14, outline: "none",
+      transition: "border 0.2s", ...props.style
+    }} onFocus={e => e.target.style.borderColor = G.mercan} onBlur={e => e.target.style.borderColor = G.border} />
+  </div>
+);
+
+// ── SOUND ──────────────────────────────────────────────────────────────────
+const playSuccess = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [523.25, 659.25, 783.99].forEach((f, i) => {
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = f; g.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.15);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.4);
+      o.start(ctx.currentTime + i * 0.15); o.stop(ctx.currentTime + i * 0.15 + 0.4);
+    });
+  } catch {}
+};
+
+// ══════════════════════════════════════════════════════════════════════════
+// ADMIN LOGIN
+// ══════════════════════════════════════════════════════════════════════════
+function AdminLogin({ onLogin }) {
+  const [pw, setPw] = useState(""); const [err, setErr] = useState(false);
+  const submit = () => { if (pw === "admin123") { onLogin(); } else { setErr(true); setTimeout(() => setErr(false), 1500); } };
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: `radial-gradient(ellipse at 30% 50%, ${G.mercan}18 0%, ${G.antrasit} 60%)` }}>
+      <Card style={{ width: 380, textAlign: "center" }}>
+        <div style={{ fontSize: 40, marginBottom: 8 }}>🔐</div>
+        <h2 style={{ fontFamily: "'Syne'", fontSize: 22, marginBottom: 4 }}>Admin Girişi</h2>
+        <p style={{ color: G.textMuted, fontSize: 13, marginBottom: 24 }}>Şifre: admin123</p>
+        <Input label="Şifre" type="password" placeholder="••••••••" value={pw}
+          onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()}
+          style={err ? { borderColor: G.red } : {}} />
+        {err && <p style={{ color: G.red, fontSize: 13, marginBottom: 8 }}>Hatalı şifre!</p>}
+        <Btn onClick={submit} style={{ width: "100%" }}>Giriş Yap</Btn>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ADMIN PANEL
+// ══════════════════════════════════════════════════════════════════════════
+function AdminPanel({ menu, setMenu, leaderboard, campaigns, setCampaigns, onBack }) {
+  const [tab, setTab] = useState("menu");
+  const [form, setForm] = useState({ name: "", type: "food", price: "", time: "", rating: "", stock: "" });
+  const [newCamp, setNewCamp] = useState("");
+  const [dailyData, setDailyData] = useState(Array(8).fill(0));
+  const [weeklyData, setWeeklyData] = useState(Array(7).fill(0));
+  const [monthlyData, setMonthlyData] = useState(Array(12).fill(0));
+  const [analyticTab, setAnalyticTab] = useState("daily");
+
+  const allItems = [...menu.foods, ...menu.soups, ...menu.drinks];
+  const topFood = [...menu.foods].sort((a, b) => b.sales - a.sales)[0];
+  const topDrink = [...menu.drinks].sort((a, b) => b.sales - a.sales)[0];
+
+  const addItem = () => {
+    if (!form.name || !form.price) return;
+    const item = {
+      id: Date.now().toString(), name: form.name, type: form.type,
+      price: +form.price, rating: +form.rating || 4.0, time: +form.time || 10,
+      sales: 0, stock: +form.stock || 99,
+      img: form.type === "drink"
+        ? "https://images.unsplash.com/photo-1554866585-cd94860890b7?w=300&q=80"
+        : "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=300&q=80"
+    };
+    const key = form.type === "drink" ? "drinks" : form.type === "soup" ? "soups" : "foods";
+    setMenu(m => ({ ...m, [key]: [...m[key], item] }));
+    setForm({ name: "", type: "food", price: "", time: "", rating: "", stock: "" });
+  };
+
+  const removeItem = (id) => {
+    setMenu(m => ({
+      foods: m.foods.filter(i => i.id !== id),
+      soups: m.soups.filter(i => i.id !== id),
+      drinks: m.drinks.filter(i => i.id !== id),
+    }));
+  };
+
+  const HOURS = ["09", "11", "13", "15", "17", "19", "21", "23"];
+  const DAYS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+  const MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+
+  const dailyChart = HOURS.map((h, i) => ({ label: h + ":00", val: dailyData[i] }));
+  const weeklyChart = DAYS.map((d, i) => ({ label: d, val: weeklyData[i] }));
+  const monthlyChart = MONTHS.map((m, i) => ({ label: m, val: monthlyData[i] }));
+
+  const tabs = [
+    { id: "menu", label: "Menü Yönetimi" },
+    { id: "analytics", label: "Veri Analizi" },
+    { id: "campaigns", label: "Kampanyalar" },
+  ];
+
+  return (
+    <div style={{ minHeight: "100vh", background: G.antrasit }}>
+      <div style={{ background: G.antrasit2, borderBottom: `1px solid ${G.border}`, padding: "0 24px", display: "flex", alignItems: "center", gap: 8, height: 60 }}>
+        <div style={{ fontFamily: "'Syne'", fontWeight: 800, fontSize: 20, color: G.mercan, marginRight: 20 }}>⚡ RESTORAN</div>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            background: tab === t.id ? G.mercan : "transparent", color: tab === t.id ? "#fff" : G.textMuted,
+            border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.2s"
+          }}>{t.label}</button>
+        ))}
+        <div style={{ marginLeft: "auto" }}>
+          <Btn onClick={onBack} variant="ghost" small>← Çıkış</Btn>
+        </div>
+      </div>
+
+      <div style={{ padding: 24, maxWidth: 1200, margin: "0 auto" }}>
+        {/* ── MENU TAB ── */}
+        {tab === "menu" && (
+          <div>
+            <h2 style={{ fontFamily: "'Syne'", fontSize: 22, marginBottom: 20 }}>Menü Ekle</h2>
+            <Card style={{ marginBottom: 24 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 12 }}>
+                <Input label="Ürün Adı" placeholder="Ürün adı girin" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: G.textMuted, display: "block", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>Kategori</label>
+                  <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
+                    style={{ width: "100%", background: G.antrasit3, border: `1px solid ${G.border}`, borderRadius: 8, padding: "10px 14px", color: G.text, fontSize: 14 }}>
+                    <option value="food">🍽 Yemek</option>
+                    <option value="soup">🥣 Çorba</option>
+                    <option value="drink">🥤 Sıcak/Soğuk İçecek</option>
+                  </select>
+                </div>
+                <Input label="Fiyat (₺)" placeholder="0" type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} />
+                <Input label="Hazırlanma (dk)" placeholder="0" type="number" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} />
+                <Input label="Puan (0-5)" placeholder="4.5" type="number" value={form.rating} onChange={e => setForm(f => ({ ...f, rating: e.target.value }))} />
+                {form.type === "drink" && <Input label="Stok Adedi" placeholder="50" type="number" value={form.stock} onChange={e => setForm(f => ({ ...f, stock: e.target.value }))} />}
+              </div>
+              <Btn onClick={addItem}>+ Menüye Ekle</Btn>
+            </Card>
+
+            <h2 style={{ fontFamily: "'Syne'", fontSize: 22, marginBottom: 12 }}>Menü Ekle / Çıkar</h2>
+
+            {/* Top Selling */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+              <Card style={{ borderLeft: `3px solid ${G.mercan}` }}>
+                <div style={{ fontSize: 12, color: G.textMuted, marginBottom: 4 }}>📈 En Çok Satan Yemek</div>
+                <div style={{ fontFamily: "'Syne'", fontWeight: 700, fontSize: 18 }}>{topFood?.name}</div>
+                <div style={{ color: G.mercan, fontSize: 13 }}>{topFood?.sales} sipariş</div>
+                <div style={{ marginTop: 8, padding: "6px 10px", background: "#f59e0b22", borderRadius: 6, fontSize: 12, color: "#f59e0b" }}>⚠ Malzeme kontrolü yapın!</div>
+              </Card>
+              <Card style={{ borderLeft: `3px solid #3b82f6` }}>
+                <div style={{ fontSize: 12, color: G.textMuted, marginBottom: 4 }}>🥤 En Çok Satan İçecek</div>
+                <div style={{ fontFamily: "'Syne'", fontWeight: 700, fontSize: 18 }}>{topDrink?.name}</div>
+                <div style={{ color: "#3b82f6", fontSize: 13 }}>{topDrink?.sales} sipariş</div>
+                <div style={{ marginTop: 8, padding: "6px 10px", background: topDrink?.stock < 20 ? "#ef444422" : "#22c55e22", borderRadius: 6, fontSize: 12, color: topDrink?.stock < 20 ? G.red : G.green }}>
+                  {topDrink?.stock < 20 ? `⚠ Kritik stok: ${topDrink?.stock} adet` : `✓ Stok: ${topDrink?.stock} adet`}
+                </div>
+              </Card>
+            </div>
+
+            {/* Item List */}
+            <div style={{ display: "grid", gap: 8 }}>
+              {allItems.map(item => (
+                <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, background: G.antrasit2, border: `1px solid ${G.border}`, borderRadius: 10, padding: "10px 16px" }}>
+                  <img src={item.img} alt={item.name} style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover" }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600 }}>{item.name}</div>
+                    <div style={{ fontSize: 12, color: G.textMuted }}>
+                      {item.type === "food" ? "🍽 Yemek" : item.type === "soup" ? "🥣 Çorba" : "🥤 İçecek"}
+                      {" • "}₺{item.price} • ⭐{item.rating} • {item.time}dk
+                      {item.type === "drink" && ` • Stok: ${item.stock}`}
+                    </div>
+                  </div>
+                  <Btn onClick={() => removeItem(item.id)} variant="danger" small>Kaldır</Btn>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── ANALYTICS TAB ── */}
+        {tab === "analytics" && (
+          <div>
+            <h2 style={{ fontFamily: "'Syne'", fontSize: 22, marginBottom: 20 }}>Veri Analizi</h2>
+            <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+              {["daily", "weekly", "monthly"].map(t => (
+                <Btn key={t} onClick={() => setAnalyticTab(t)} variant={analyticTab === t ? "primary" : "dark"} small>
+                  {t === "daily" ? "Günlük" : t === "weekly" ? "Haftalık" : "Aylık"}
+                </Btn>
+              ))}
+            </div>
+
+            {analyticTab === "daily" && (
+              <Card>
+                <h3 style={{ fontFamily: "'Syne'", marginBottom: 20 }}>Günlük Yoğunluk (Saat Bazlı)</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={dailyChart} layout="vertical" margin={{ left: 10, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={G.border} />
+                    <XAxis type="number" domain={[0, 80]} ticks={[0,10,20,30,40,50,60,70,80]} stroke={G.textMuted} tick={{ fill: G.textMuted, fontSize: 11 }} />
+                    <YAxis dataKey="label" type="category" stroke={G.textMuted} tick={{ fill: G.textMuted, fontSize: 11 }} width={50} />
+                    <Tooltip contentStyle={{ background: G.antrasit3, border: `1px solid ${G.border}`, borderRadius: 8 }} />
+                    <Bar dataKey="val" radius={[0,6,6,0]}>
+                      {dailyChart.map((_, i) => <Cell key={i} fill={dailyData[i] > 60 ? G.mercan : dailyData[i] > 30 ? "#f59e0b" : "#3b82f6"} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <div style={{ marginTop: 16 }}>
+                  <p style={{ fontSize: 13, color: G.textMuted, marginBottom: 8 }}>En yoğun saatleri gir:</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                    {HOURS.map((h, i) => (
+                      <div key={h}>
+                        <label style={{ fontSize: 11, color: G.textMuted }}>{h}:00</label>
+                        <input type="number" min={0} max={80} value={dailyData[i]}
+                          onChange={e => setDailyData(d => { const n = [...d]; n[i] = +e.target.value; return n; })}
+                          style={{ width: "100%", background: G.antrasit3, border: `1px solid ${G.border}`, borderRadius: 6, padding: "6px 10px", color: G.text, fontSize: 13 }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {analyticTab === "weekly" && (
+              <Card>
+                <h3 style={{ fontFamily: "'Syne'", marginBottom: 20 }}>Haftalık Yoğunluk (Gün Bazlı)</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={weeklyChart} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke={G.border} />
+                    <XAxis type="number" domain={[0, 360]} ticks={[0,30,60,90,120,150,180,210,240,270,300,330,360]} stroke={G.textMuted} tick={{ fill: G.textMuted, fontSize: 10 }} />
+                    <YAxis dataKey="label" type="category" stroke={G.textMuted} tick={{ fill: G.textMuted, fontSize: 12 }} width={40} />
+                    <Tooltip contentStyle={{ background: G.antrasit3, border: `1px solid ${G.border}`, borderRadius: 8 }} />
+                    <Bar dataKey="val" radius={[0,6,6,0]}>
+                      {weeklyChart.map((_, i) => <Cell key={i} fill={weeklyData[i] > 240 ? G.mercan : weeklyData[i] > 120 ? "#f59e0b" : "#3b82f6"} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <div style={{ marginTop: 16 }}>
+                  <p style={{ fontSize: 13, color: G.textMuted, marginBottom: 8 }}>Yoğun olan kısmı gir:</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 8 }}>
+                    {DAYS.map((d, i) => (
+                      <div key={d}>
+                        <label style={{ fontSize: 11, color: G.textMuted }}>{d}</label>
+                        <input type="number" min={0} max={360} value={weeklyData[i]}
+                          onChange={e => setWeeklyData(w => { const n = [...w]; n[i] = +e.target.value; return n; })}
+                          style={{ width: "100%", background: G.antrasit3, border: `1px solid ${G.border}`, borderRadius: 6, padding: "6px 10px", color: G.text, fontSize: 13 }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {analyticTab === "monthly" && (
+              <Card>
+                <h3 style={{ fontFamily: "'Syne'", marginBottom: 20 }}>Aylık Yoğunluk</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={monthlyChart} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke={G.border} />
+                    <XAxis type="number" domain={[0, 2500]} ticks={[0,500,700,900,1100,1300,1500,1700,1900,2100,2300,2500]} stroke={G.textMuted} tick={{ fill: G.textMuted, fontSize: 10 }} />
+                    <YAxis dataKey="label" type="category" stroke={G.textMuted} tick={{ fill: G.textMuted, fontSize: 11 }} width={35} />
+                    <Tooltip contentStyle={{ background: G.antrasit3, border: `1px solid ${G.border}`, borderRadius: 8 }} />
+                    <Bar dataKey="val" radius={[0,6,6,0]}>
+                      {monthlyChart.map((_, i) => <Cell key={i} fill={monthlyData[i] > 1800 ? G.mercan : monthlyData[i] > 1000 ? "#f59e0b" : "#3b82f6"} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8 }}>
+                    {MONTHS.map((m, i) => (
+                      <div key={m}>
+                        <label style={{ fontSize: 11, color: G.textMuted }}>{m}</label>
+                        <input type="number" min={0} max={2500} value={monthlyData[i]}
+                          onChange={e => setMonthlyData(md => { const n = [...md]; n[i] = +e.target.value; return n; })}
+                          style={{ width: "100%", background: G.antrasit3, border: `1px solid ${G.border}`, borderRadius: 6, padding: "6px 10px", color: G.text, fontSize: 13 }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* ── CAMPAIGNS TAB ── */}
+        {tab === "campaigns" && (
+          <div>
+            <h2 style={{ fontFamily: "'Syne'", fontSize: 22, marginBottom: 20 }}>Kampanyalar</h2>
+            <Card style={{ marginBottom: 20 }}>
+              <p style={{ fontSize: 13, color: G.textMuted, marginBottom: 12 }}>📅 Güne Göre Yoğun Saat ve Gün</p>
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                {["Pazartesi 12:00-14:00", "Cuma 19:00-21:00", "Cumartesi 18:00-22:00"].map(s => (
+                  <div key={s} style={{ background: G.antrasit3, padding: "8px 14px", borderRadius: 8, fontSize: 13, color: G.mercan2, border: `1px solid ${G.mercan}44` }}>🔥 {s}</div>
+                ))}
+              </div>
+            </Card>
+            <Card>
+              <h3 style={{ fontFamily: "'Syne'", marginBottom: 16 }}>Kampanya Ekle / Çıkar</h3>
+              <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                <input value={newCamp} onChange={e => setNewCamp(e.target.value)} placeholder="Kampanya metni yazın..."
+                  style={{ flex: 1, background: G.antrasit3, border: `1px solid ${G.border}`, borderRadius: 8, padding: "10px 14px", color: G.text, fontSize: 14 }} />
+                <Btn onClick={() => { if (newCamp) { setCampaigns(c => [...c, newCamp]); setNewCamp(""); } }}>Ekle</Btn>
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {campaigns.map((c, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, background: G.antrasit3, borderRadius: 8, padding: "10px 14px", border: `1px solid ${G.border}` }}>
+                    <span style={{ flex: 1, fontSize: 14 }}>🎯 {c}</span>
+                    <Btn onClick={() => setCampaigns(cs => cs.filter((_, j) => j !== i))} variant="danger" small>Kaldır</Btn>
+                  </div>
+                ))}
+                {campaigns.length === 0 && <p style={{ color: G.textMuted, fontSize: 13 }}>Henüz kampanya eklenmedi.</p>}
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// CUSTOMER LOGIN
+// ══════════════════════════════════════════════════════════════════════════
+function CustomerLogin({ onLogin }) {
+  const [name, setName] = useState(""); const [phone, setPhone] = useState("");
+  const submit = () => { if (name && phone) onLogin({ name, phone }); };
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: `radial-gradient(ellipse at 70% 50%, ${G.mercan}18 0%, ${G.antrasit} 60%)` }}>
+      <Card style={{ width: 380, textAlign: "center" }}>
+        <div style={{ fontSize: 40, marginBottom: 8 }}>🍽️</div>
+        <h2 style={{ fontFamily: "'Syne'", fontSize: 22, marginBottom: 4 }}>Müşteri Girişi</h2>
+        <p style={{ color: G.textMuted, fontSize: 13, marginBottom: 24 }}>Devam etmek için bilgilerinizi girin</p>
+        <Input label="Ad Soyad" placeholder="Adınızı ve soyadınızı girin" value={name} onChange={e => setName(e.target.value)} />
+        <Input label="Telefon Numarası" placeholder="05XX XXX XX XX" value={phone} onChange={e => setPhone(e.target.value)} />
+        <Btn onClick={submit} style={{ width: "100%", marginTop: 8 }}>Giriş Yap</Btn>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// LANGUAGE SELECT
+// ══════════════════════════════════════════════════════════════════════════
+function LangSelect({ onSelect }) {
+  const langs = [
+    { code: "tr", label: "Türkçe", flag: "🇹🇷" },
+    { code: "en", label: "English", flag: "🇬🇧" },
+    { code: "es", label: "Español", flag: "🇪🇸" },
+  ];
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: `radial-gradient(circle at 50% 40%, ${G.mercan}20 0%, ${G.antrasit} 70%)` }}>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 48, marginBottom: 12 }}>🌍</div>
+        <h2 style={{ fontFamily: "'Syne'", fontSize: 28, marginBottom: 8 }}>Dil Seçin</h2>
+        <p style={{ color: G.textMuted, marginBottom: 32 }}>Select Language / Seleccionar Idioma</p>
+        <div style={{ display: "flex", gap: 16, justifyContent: "center" }}>
+          {langs.map(l => (
+            <button key={l.code} onClick={() => onSelect(l.code)} style={{
+              background: G.antrasit2, border: `2px solid ${G.border}`, borderRadius: 16, padding: "24px 32px",
+              cursor: "pointer", transition: "all 0.2s", color: G.text,
+            }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = G.mercan; e.currentTarget.style.transform = "translateY(-4px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = G.border; e.currentTarget.style.transform = "translateY(0)"; }}>
+              <div style={{ fontSize: 36 }}>{l.flag}</div>
+              <div style={{ fontFamily: "'Syne'", fontWeight: 700, marginTop: 8, fontSize: 16 }}>{l.label}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PAYMENT
+// ══════════════════════════════════════════════════════════════════════════
+function Payment({ total, lang, onDone, onBack }) {
+  const t = T[lang];
+  const [step, setStep] = useState("method"); // method | cash | card | tip | result
+  const [cardNum, setCardNum] = useState(""); const [expiry, setExpiry] = useState(""); const [cvv, setCvv] = useState("");
+  const [result, setResult] = useState(null); const [tip, setTip] = useState(false);
+
+  const processCard = () => {
+    const success = cardNum.length >= 16 && expiry.length >= 4 && cvv.length >= 3;
+    setResult(success); setStep("result");
+    if (success) playSuccess();
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: G.antrasit, padding: 24 }}>
+      <Card style={{ width: "100%", maxWidth: 440, textAlign: "center" }}>
+        {step === "method" && (
+          <>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>💳</div>
+            <h2 style={{ fontFamily: "'Syne'", marginBottom: 8 }}>{t.pay}</h2>
+            <div style={{ fontSize: 24, fontWeight: 800, color: G.mercan, marginBottom: 24 }}>₺{total.toFixed(2)}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <button onClick={() => setStep("cash")} style={{
+                background: "#ef444422", border: `2px solid ${G.red}`, borderRadius: 12, padding: 24, cursor: "pointer", color: G.red, fontSize: 18, fontWeight: 700
+              }}>💵 {t.cash}</button>
+              <button onClick={() => setStep("card")} style={{
+                background: G.mercan + "22", border: `2px solid ${G.mercan}`, borderRadius: 12, padding: 24, cursor: "pointer", color: G.mercan, fontSize: 18, fontWeight: 700
+              }}>💳 {t.card}</button>
+            </div>
+            <Btn onClick={onBack} variant="ghost" style={{ marginTop: 16, width: "100%" }}>← Geri</Btn>
+          </>
+        )}
+
+        {step === "cash" && (
+          <div style={{ background: "#ef444418", border: `2px solid ${G.red}`, borderRadius: 12, padding: 32 }}>
+            <div style={{ fontSize: 40 }}>🏪</div>
+            <h2 style={{ fontFamily: "'Syne'", fontSize: 24, color: G.red, marginTop: 16 }}>{t.cashMsg}</h2>
+            <p style={{ color: G.textMuted, marginTop: 8 }}>₺{total.toFixed(2)}</p>
+            <Btn onClick={() => setStep("method")} variant="dark" style={{ marginTop: 20 }}>← Geri</Btn>
+          </div>
+        )}
+
+        {step === "card" && (
+          <>
+            <h2 style={{ fontFamily: "'Syne'", marginBottom: 20 }}>{t.cardInfo}</h2>
+            <Input label={t.cardNum} placeholder="1234 5678 9012 3456" value={cardNum}
+              onChange={e => setCardNum(e.target.value.replace(/\D/g, "").slice(0, 16))} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <Input label={t.expiry} placeholder="MM/YY" value={expiry} onChange={e => setExpiry(e.target.value)} />
+              <Input label={t.cvv} placeholder="123" value={cvv} onChange={e => setCvv(e.target.value.slice(0, 3))} />
+            </div>
+            <div style={{ margin: "16px 0", padding: 14, background: G.antrasit3, borderRadius: 10, textAlign: "left" }}>
+              <p style={{ fontSize: 14, marginBottom: 8 }}>{t.tip}</p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Btn onClick={() => setTip(true)} variant={tip ? "primary" : "dark"} small>{t.tipYes}</Btn>
+                <Btn onClick={() => setTip(false)} variant={!tip ? "dark" : "ghost"} small>{t.tipNo}</Btn>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <span style={{ color: G.textMuted }}>Toplam:</span>
+              <span style={{ fontSize: 20, fontWeight: 800, color: G.mercan }}>₺{(tip ? total * 1.1 : total).toFixed(2)}</span>
+            </div>
+            <Btn onClick={processCard} style={{ width: "100%" }}>{t.payNow}</Btn>
+            <Btn onClick={() => setStep("method")} variant="ghost" style={{ marginTop: 10, width: "100%" }}>← Geri</Btn>
+          </>
+        )}
+
+        {step === "result" && (
+          <div style={{
+            background: result ? "#22c55e22" : "#ef444422",
+            border: `3px solid ${result ? G.green : G.red}`,
+            borderRadius: 20, padding: 40
+          }}>
+            <div style={{ fontSize: 64, animation: "pulse 1s ease-in-out" }}>{result ? "✅" : "❌"}</div>
+            <div style={{
+              width: 120, height: 120, borderRadius: "50%", margin: "20px auto",
+              background: result ? G.green : G.red,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 20, fontWeight: 800, color: "#fff",
+              boxShadow: `0 0 40px ${result ? G.green : G.red}88`,
+              animation: "pop 0.5s ease"
+            }}>
+              {result ? t.paySuccess : t.payFail}
+            </div>
+            <Btn onClick={() => { onDone(result); }} style={{ marginTop: 16, width: "100%" }} variant={result ? "success" : "danger"}>
+              {result ? "Tamamla" : "Tekrar Dene"}
+            </Btn>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// CUSTOMER APP
+// ══════════════════════════════════════════════════════════════════════════
+function CustomerApp({ menu, setMenu, leaderboard, setLeaderboard, campaigns, user }) {
+  const [lang, setLang] = useState(null);
+  const [menuTab, setMenuTab] = useState("foods");
+  const [cart, setCart] = useState([]);
+  const [notes, setNotes] = useState({});
+  const [craving, setCraving] = useState("");
+  const [cravingResult, setCravingResult] = useState(null);
+  const [showCart, setShowCart] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+
+  if (!lang) return <LangSelect onSelect={setLang} />;
+  const t = T[lang];
+
+  const allItems = [...menu.foods, ...menu.soups, ...menu.drinks];
+  const weekTopFood = [...menu.foods, ...menu.soups].sort((a, b) => b.sales - a.sales)[0];
+
+  const searchCraving = () => {
+    const q = craving.toLowerCase();
+    const found = allItems.find(i =>
+      i.name.toLowerCase().includes(q) ||
+      (q.includes("sıcak") && i.type === "soup") ||
+      (q.includes("içecek") && i.type === "drink") ||
+      (q.includes("et") && ["f1","f2","f5"].includes(i.id)) ||
+      (q.includes("tavuk") && i.id === "f3") ||
+      true
+    ) || allItems[Math.floor(Math.random() * allItems.length)];
+    setCravingResult(found);
+  };
+
+  const addToCart = (item) => {
+    if (item.type === "drink" && item.stock <= 0) return;
+    setCart(c => {
+      const existing = c.find(x => x.id === item.id);
+      if (existing) return c.map(x => x.id === item.id ? { ...x, qty: x.qty + 1 } : x);
+      return [...c, { ...item, qty: 1 }];
+    });
+    if (item.type === "drink") {
+      setMenu(m => ({
+        ...m,
+        drinks: m.drinks.map(d => d.id === item.id ? { ...d, stock: d.stock - 1 } : d)
+      }));
+    }
+  };
+
+  const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const cartCount = cart.reduce((s, i) => s + i.qty, 0);
+
+  const handlePaymentDone = (success) => {
+    if (success) {
+      const pts = Math.floor(cartTotal / 10);
+      setLeaderboard(lb => {
+        const existing = lb.find(x => x.name === user.name);
+        if (existing) return lb.map(x => x.name === user.name ? { ...x, points: x.points + pts } : x).sort((a, b) => b.points - a.points);
+        return [...lb, { name: user.name, points: pts }].sort((a, b) => b.points - a.points);
+      });
+      setCart([]);
+    }
+    setPaying(false);
+  };
+
+  if (paying) return <Payment total={cartTotal} lang={lang} onDone={handlePaymentDone} onBack={() => setPaying(false)} />;
+
+  const tabs = [
+    { id: "foods", label: t.foods, emoji: "🍽" },
+    { id: "soups", label: t.soups, emoji: "🥣" },
+    { id: "drinks", label: t.drinks, emoji: "🥤" },
+  ];
+
+  const medalFor = (i) => {
+    if (i === 0) return { color: G.gold, icon: "🥇" };
+    if (i === 1) return { color: G.silver, icon: "🥈" };
+    if (i === 2) return { color: G.bronze, icon: "🥉" };
+    return { color: G.textMuted, icon: `#${i + 1}` };
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: G.antrasit, paddingBottom: 80 }}>
+      {/* Header */}
+      <div style={{ background: G.antrasit2, borderBottom: `1px solid ${G.border}`, padding: "0 16px", height: 60, display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, zIndex: 100 }}>
+        <div style={{ fontFamily: "'Syne'", fontWeight: 800, fontSize: 18, color: G.mercan }}>⚡ RESTORAN</div>
+        <div style={{ flex: 1 }} />
+        <button onClick={() => setShowLeaderboard(!showLeaderboard)} style={{
+          background: "transparent", border: `1px solid ${G.gold}66`, borderRadius: 8, padding: "6px 12px",
+          color: G.gold, fontSize: 12, fontWeight: 600, cursor: "pointer"
+        }}>🏆 {t.rankings}</button>
+        <button onClick={() => setShowCart(!showCart)} style={{
+          background: G.mercan, border: "none", borderRadius: 8, padding: "8px 14px",
+          color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", position: "relative"
+        }}>
+          🛒 {cartCount > 0 && <span style={{ background: G.red, borderRadius: "50%", width: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, marginLeft: 4 }}>{cartCount}</span>}
+        </button>
+      </div>
+
+      {/* Leaderboard Sidebar */}
+      {showLeaderboard && (
+        <div style={{ position: "fixed", right: 0, top: 60, bottom: 0, width: 280, background: G.antrasit2, borderLeft: `1px solid ${G.border}`, zIndex: 200, padding: 16, overflowY: "auto" }}>
+          <h3 style={{ fontFamily: "'Syne'", marginBottom: 16 }}>🏆 {t.rankings}</h3>
+          {leaderboard.map((lb, i) => {
+            const medal = medalFor(i);
+            return (
+              <div key={lb.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: G.antrasit3, borderRadius: 10, marginBottom: 8, border: i < 3 ? `1px solid ${medal.color}44` : `1px solid ${G.border}` }}>
+                <span style={{ fontSize: i < 3 ? 20 : 14, color: medal.color, minWidth: 28 }}>{medal.icon}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{lb.name}</div>
+                  <div style={{ fontSize: 12, color: medal.color }}>{lb.points} {t.points}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{ maxWidth: 800, margin: "0 auto", padding: "20px 16px" }}>
+        {/* Campaigns */}
+        {campaigns.length > 0 && (
+          <div style={{ marginBottom: 16, display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+            {campaigns.map((c, i) => (
+              <div key={i} style={{ background: `${G.mercan}22`, border: `1px solid ${G.mercan}44`, borderRadius: 20, padding: "6px 14px", fontSize: 12, color: G.mercan2, whiteSpace: "nowrap" }}>🎯 {c}</div>
+            ))}
+          </div>
+        )}
+
+        {/* Top of Week */}
+        <Card style={{ marginBottom: 20, background: `linear-gradient(135deg, ${G.antrasit2}, ${G.antrasit3})`, border: `1px solid ${G.mercan}44` }}>
+          <div style={{ fontSize: 12, color: G.mercan, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>⭐ {t.topDish}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <img src={weekTopFood?.img} alt={weekTopFood?.name} style={{ width: 64, height: 64, borderRadius: 12, objectFit: "cover" }} />
+            <div>
+              <div style={{ fontFamily: "'Syne'", fontWeight: 700, fontSize: 20 }}>{weekTopFood?.name}</div>
+              <div style={{ color: G.textMuted, fontSize: 13 }}>₺{weekTopFood?.price} • ⭐ {weekTopFood?.rating} • {weekTopFood?.sales} {t.points === "puan" ? "sipariş" : "orders"}</div>
+            </div>
+            <Btn onClick={() => addToCart(weekTopFood)} style={{ marginLeft: "auto" }} small>{t.addToCart}</Btn>
+          </div>
+        </Card>
+
+        {/* Craving Search */}
+        <Card style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: 13, color: G.textMuted, marginBottom: 8, display: "block" }}>{t.cravingLabel}</label>
+          <div style={{ display: "flex", gap: 8, marginBottom: cravingResult ? 12 : 0 }}>
+            <input value={craving} onChange={e => setCraving(e.target.value)} placeholder={t.cravingPlaceholder}
+              onKeyDown={e => e.key === "Enter" && searchCraving()}
+              style={{ flex: 1, background: G.antrasit3, border: `1px solid ${G.border}`, borderRadius: 8, padding: "10px 14px", color: G.text, fontSize: 14 }} />
+            <Btn onClick={searchCraving} small>🔍</Btn>
+          </div>
+          {cravingResult && (
+            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, background: G.antrasit3, borderRadius: 10, border: `1px solid ${G.mercan}44` }}>
+              <img src={cravingResult.img} alt={cravingResult.name} style={{ width: 50, height: 50, borderRadius: 8, objectFit: "cover" }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600 }}>{cravingResult.name}</div>
+                <div style={{ fontSize: 12, color: G.textMuted }}>₺{cravingResult.price}</div>
+              </div>
+              <Btn onClick={() => addToCart(cravingResult)} small>{t.addToCart}</Btn>
+            </div>
+          )}
+        </Card>
+
+        {/* Menu Tabs */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+          {tabs.map(tab => (
+            <button key={tab.id} onClick={() => setMenuTab(tab.id)} style={{
+              background: menuTab === tab.id ? G.mercan : G.antrasit2,
+              color: menuTab === tab.id ? "#fff" : G.textMuted,
+              border: `1px solid ${menuTab === tab.id ? G.mercan : G.border}`,
+              borderRadius: 10, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer"
+            }}>{tab.emoji} {tab.label}</button>
+          ))}
+        </div>
+
+        {/* Menu Items */}
+        <div style={{ display: "grid", gap: 12 }}>
+          {menu[menuTab].map(item => (
+            <div key={item.id} style={{ background: G.antrasit2, border: `1px solid ${G.border}`, borderRadius: 14, overflow: "hidden", display: "flex", gap: 0 }}>
+              <img src={item.img} alt={item.name} style={{ width: 100, height: 100, objectFit: "cover" }} />
+              <div style={{ flex: 1, padding: "12px 14px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontFamily: "'Syne'", fontWeight: 700, fontSize: 15 }}>{item.name}</div>
+                  <div style={{ fontSize: 12, color: G.textMuted, marginTop: 2 }}>
+                    ⭐ {item.rating} • ⏱ {item.time}{t.min}
+                    {item.type === "drink" && (
+                      <span style={{ marginLeft: 6, color: item.stock < 10 ? G.red : G.green }}>
+                        • {item.stock > 0 ? `${item.stock} adet` : "Tükendi"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontFamily: "'Syne'", fontWeight: 800, fontSize: 17, color: G.mercan }}>₺{item.price}</span>
+                    <input placeholder={t.note} value={notes[item.id] || ""}
+                      onChange={e => setNotes(n => ({ ...n, [item.id]: e.target.value }))}
+                      style={{ background: G.antrasit3, border: `1px solid ${G.border}`, borderRadius: 6, padding: "4px 8px", fontSize: 12, color: G.textMuted, width: 120 }} />
+                  </div>
+                  <Btn onClick={() => addToCart(item)} small
+                    style={item.type === "drink" && item.stock === 0 ? { opacity: 0.4, cursor: "not-allowed" } : {}}
+                  >{t.addToCart}</Btn>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Cart Sidebar */}
+      {showCart && (
+        <div style={{ position: "fixed", right: 0, top: 60, bottom: 0, width: 320, background: G.antrasit2, borderLeft: `1px solid ${G.border}`, zIndex: 200, display: "flex", flexDirection: "column" }}>
+          <div style={{ padding: 16, borderBottom: `1px solid ${G.border}` }}>
+            <h3 style={{ fontFamily: "'Syne'" }}>🛒 {t.cart}</h3>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+            {cart.length === 0 ? <p style={{ color: G.textMuted, fontSize: 13 }}>Sepetiniz boş</p> : cart.map(item => (
+              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, padding: 10, background: G.antrasit3, borderRadius: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{item.name}</div>
+                  <div style={{ fontSize: 12, color: G.textMuted }}>x{item.qty}</div>
+                </div>
+                <div style={{ color: G.mercan, fontWeight: 700 }}>₺{item.price * item.qty}</div>
+                <button onClick={() => setCart(c => c.map(x => x.id === item.id ? { ...x, qty: x.qty - 1 } : x).filter(x => x.qty > 0))}
+                  style={{ background: G.antrasit, border: `1px solid ${G.border}`, borderRadius: 6, width: 24, height: 24, color: G.text, cursor: "pointer" }}>−</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ padding: 16, borderTop: `1px solid ${G.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+              <span style={{ fontWeight: 600 }}>{t.total}</span>
+              <span style={{ fontFamily: "'Syne'", fontWeight: 800, fontSize: 18, color: G.mercan }}>₺{cartTotal.toFixed(2)}</span>
+            </div>
+            <Btn onClick={() => { setShowCart(false); setPaying(true); }} style={{ width: "100%" }} disabled={cart.length === 0}>{t.pay}</Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ROOT
+// ══════════════════════════════════════════════════════════════════════════
+export default function App() {
+  const [screen, setScreen] = useState("home"); // home | adminLogin | admin | customerLogin | customer
+  const [menu, setMenu] = useState(INITIAL_MENU);
+  const [leaderboard, setLeaderboard] = useState(INITIAL_LEADERBOARD);
+  const [campaigns, setCampaigns] = useState(["Bugün %10 indirim!", "3 al 2 öde çorbalarda"]);
+  const [user, setUser] = useState(null);
+
+  return (
+    <>
+      <style>{css}</style>
+      <style>{`@keyframes pop { 0%{transform:scale(0)} 60%{transform:scale(1.15)} 100%{transform:scale(1)} } @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }`}</style>
+
+      {screen === "home" && (
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: `radial-gradient(ellipse at 50% 30%, ${G.mercan}20 0%, ${G.antrasit} 65%)` }}>
+          <div style={{ textAlign: "center", padding: 24 }}>
+            <div style={{ fontSize: 56, marginBottom: 12 }}>⚡</div>
+            <h1 style={{ fontFamily: "'Syne'", fontSize: 40, fontWeight: 800, marginBottom: 8 }}>
+              <span style={{ color: G.mercan }}>RESTO</span>PANEL
+            </h1>
+            <p style={{ color: G.textMuted, marginBottom: 40, fontSize: 15 }}>Modern Restoran Yönetim Sistemi</p>
+            <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+              <button onClick={() => setScreen("adminLogin")} style={{
+                background: G.antrasit2, border: `2px solid ${G.border}`, borderRadius: 16, padding: "28px 40px", cursor: "pointer",
+                color: G.text, transition: "all 0.2s",
+              }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = G.mercan; e.currentTarget.style.transform = "translateY(-4px)"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = G.border; e.currentTarget.style.transform = "translateY(0)"; }}>
+                <div style={{ fontSize: 36 }}>🔐</div>
+                <div style={{ fontFamily: "'Syne'", fontWeight: 700, fontSize: 16, marginTop: 10 }}>Admin Girişi</div>
+                <div style={{ fontSize: 12, color: G.textMuted, marginTop: 4 }}>Yönetici Paneli</div>
+              </button>
+              <button onClick={() => setScreen("customerLogin")} style={{
+                background: G.antrasit2, border: `2px solid ${G.border}`, borderRadius: 16, padding: "28px 40px", cursor: "pointer",
+                color: G.text, transition: "all 0.2s",
+              }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = G.mercan; e.currentTarget.style.transform = "translateY(-4px)"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = G.border; e.currentTarget.style.transform = "translateY(0)"; }}>
+                <div style={{ fontSize: 36 }}>🛍️</div>
+                <div style={{ fontFamily: "'Syne'", fontWeight: 700, fontSize: 16, marginTop: 10 }}>Müşteri Girişi</div>
+                <div style={{ fontSize: 12, color: G.textMuted, marginTop: 4 }}>Sipariş Ver</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {screen === "adminLogin" && <AdminLogin onLogin={() => setScreen("admin")} />}
+      {screen === "admin" && (
+        <AdminPanel menu={menu} setMenu={setMenu} leaderboard={leaderboard}
+          campaigns={campaigns} setCampaigns={setCampaigns} onBack={() => setScreen("home")} />
+      )}
+      {screen === "customerLogin" && (
+        <CustomerLogin onLogin={(u) => { setUser(u); setScreen("customer"); }} />
+      )}
+      {screen === "customer" && (
+        <CustomerApp menu={menu} setMenu={setMenu} leaderboard={leaderboard}
+          setLeaderboard={setLeaderboard} campaigns={campaigns} user={user} />
+      )}
+    </>
+  );
+}
